@@ -16,8 +16,30 @@ const RegistrationSchema = new mongoose.Schema({
   rollNumber: String,
   email: String,
   mobileNumber: String,
-  teamMemberDetails: [TeamMemberSchema],
+  
+  team_member_1: String,
+  team_member_1_roll_no: String,
+  team_member_1_gender: String,
+  
+  team_member_2: String,
+  team_member_2_roll_no: String,
+  team_member_2_gender: String,
+  
+  team_member_3: String,
+  team_member_3_roll_no: String,
+  team_member_3_gender: String,
+  
+  team_member_4: String,
+  team_member_4_roll_no: String,
+  team_member_4_gender: String,
+
+  team_member_5: String,
+  team_member_5_roll_no: String,
+  team_member_5_gender: String,
+  
   track: String,
+
+  file_path: String,
 });
 
 const Registration = mongoose.model('Registration', RegistrationSchema);
