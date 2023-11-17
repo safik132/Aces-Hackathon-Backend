@@ -40,7 +40,7 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
 
       const uploadParams = {
         Bucket: process.env.BUCKET_NAME,
-        Key: req.file.filename,
+        Key: req.file.originalname,
         Body: fileStream
       };
 
