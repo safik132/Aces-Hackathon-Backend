@@ -1,13 +1,18 @@
 // app.js
+
 const express = require('express');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
+require('dotenv').config();
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const AWS = require('aws-sdk');
 const Registration = require('./models/Registration');
-require('dotenv').config();
+const User = require('./models/User');
+
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -60,6 +65,118 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
+});
+
+// Nodemailer configuration
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
+
+// Helper function to send OTP
+const sendOtp = (email, otp) => {
+  const mailOptions = {
+    from: process.env.EMAIL,
+    to: email,
+    subject: 'Your OTP',
+    text: `Your OTP is ${otp}`
+  };
+
+  transporter.sendMail(mailOptions, function(error, info){
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Email sent: ' + info.response);
+    }
+  });
+};
+
+// Generate OTP
+const generateOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Register user and send OTP
+app.post('/api/registeruser', async (req, res) => {
+  const { name, email, phone, otp } = req.body;
+
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).send('User already exists');
+    }
+
+    const otpToVerify = generateOtp();
+    sendOtp(email, otpToVerify);
+
+    // Here, you should store the OTP and its expiry in your database
+    // This is a simplified version without actual database storage
+
+    res.status(200).send('OTP sent');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Verify OTP and complete registration
+app.post('/api/verify-register', async (req, res) => {
+  const { name, email, phone, otp } = req.body;
+
+  // Here, verify the OTP from the database
+  // This is a simplified version without actual database verification
+
+  // Create and store user
+  const newUser = new User({
+    name,
+    email,
+    phone
+    // Here, you would normally hash the password and store it
+  });
+
+  // Save user to the database
+  // This is a placeholder for actual database operation
+  await newUser.save();
+
+  res.status(201).send('User registered successfully');
+});
+
+// Login user and send OTP
+app.post('/api/login', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+
+    const otp = generateOtp();
+    sendOtp(email, otp);
+
+    // Here, you should store the OTP and its expiry in your database
+    // This is a simplified version without actual database storage
+
+    res.status(200).send('OTP sent');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Verify OTP and login
+app.post('/api/verify-login', async (req, res) => {
+  const { email, otp } = req.body;
+
+  // Here, verify the OTP from the database
+  // This is a simplified version without actual database verification
+
+  // Generate and send a JWT or some form of session token
+  // This is a placeholder for actual token generation
+  const token = jwt.sign({ email }, 'your_secret_key');
+
+  res.status(200).json({ message: 'Logged in successfully', token });
 });
 
 const PORT = process.env.PORT || 5000;
