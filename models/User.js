@@ -10,19 +10,19 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  phoneNumber: {
+  phone: {
     type: String,
     required: true,
     unique: true
   },
-    otp: {
-        type: String,
-        default: '',
-    },
-    otpExpiry: {
-        type: Date,
-    },
-  
+  otp: {
+    type: String,
+    default: '',
+  },
+  otpExpiry: {
+    type: Date,
+    default: null,
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
