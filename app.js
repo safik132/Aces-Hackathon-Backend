@@ -37,6 +37,7 @@ mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology
 // POST API Endpoint
 
 app.post('/api/register', upload.single('file'), async (req, res) => {
+  console.log("first file uploaded hitted with",req)
   try {
     let file_path = '';
 
