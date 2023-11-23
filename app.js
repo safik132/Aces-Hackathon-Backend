@@ -163,7 +163,8 @@ app.post('/api/verify-register', async (req, res) => {
     user.otpExpiry = null;
     await user.save();
 
-    res.status(201).send('User registered successfully');
+    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    res.status(201).json({ message: 'User registered successfully', token });
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -187,8 +188,9 @@ app.post('/api/verify-login', async (req, res) => {
     // This is a placeholder for actual token generation
     // const token = jwt.sign({ email }, 'your_secret_key');
     // res.status(200).json({ message: 'Logged in successfully', token });
-
-    res.status(200).send('Logged in successfully');
+    // Generate JWT token
+    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    res.status(200).json({ message: 'Logged in successfully', token });
   } catch (err) {
     res.status(500).send(err.message);
   }
