@@ -36,8 +36,27 @@ mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology
 
 // POST API Endpoint
 
+// Function to generate email content
+const generateRegistrationEmailContent = (registrationData) => {
+  return `
+    <h1>Thank you for registering for Aces Hackathon!</h1>
+    <p>Here are the details you provided:</p>
+    <ul>
+      <li>Team Name: ${registrationData.teamName}</li>
+      <li>Team Leader: ${registrationData.teamLeaderName}</li>
+      <li>College: ${registrationData.college}</li>
+      <li>Branch: ${registrationData.branch}</li>
+      <li>Roll Number: ${registrationData.rollNumber}</li>
+      <li>Email: ${registrationData.email}</li>
+      <li>Mobile Number: ${registrationData.mobileNumber}</li>
+      <li>Track: ${registrationData.track}</li>
+      <li>Uploaded File: True</li>
+    </ul>
+  `;
+};
+
+// POST API Endpoint for registration
 app.post('/api/register', upload.single('file'), async (req, res) => {
-  console.log("first file uploaded hitted with",req)
   try {
     let file_path = '';
 
@@ -62,11 +81,29 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
 
     const newRegistration = new Registration(registrationData);
     const savedRegistration = await newRegistration.save();
+
+    // Send email after successful registration
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: savedRegistration.email,
+      subject: 'Registration Confirmation for Aces Hackathon',
+      html: generateRegistrationEmailContent(savedRegistration)
+    };
+
+    transporter.sendMail(mailOptions, function(error, info) {
+      if (error) {
+        console.error('Error sending registration confirmation email:', error);
+      } else {
+        console.log('Registration confirmation email sent:', info.response);
+      }
+    });
+
     res.status(201).json(savedRegistration);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
+
 
 /// Nodemailer configuration
 const transporter = nodemailer.createTransport({
