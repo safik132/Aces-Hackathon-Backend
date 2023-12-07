@@ -12,7 +12,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const Registration = require('./models/Registration');
 const User = require('./models/User');
-
+const OTP = require('./models/Otp');
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -139,7 +139,7 @@ const sendOtp = (email, otp) => {
 
 // Register user and send OTP
 app.post('/api/registeruser', async (req, res) => {
-  const { name, email, phone } = req.body;
+  const { email } = req.body;
 
   try {
     const userExists = await User.findOne({ email });
@@ -148,11 +148,11 @@ app.post('/api/registeruser', async (req, res) => {
     }
 
     const otp = generateOtp();
-    const otpExpiry = new Date(new Date().getTime() + (30 * 60 * 1000)); // 30 minutes from now
+    const expiry = new Date(new Date().getTime() + (30 * 60 * 1000)); // 30 minutes from now
 
-    const newUser = new User({ name, email, phone, otp, otpExpiry });
-    await newUser.save();
-    
+    // Save or update OTP in OTP collection
+    await OTP.findOneAndUpdate({ email }, { email, otp, expiry }, { upsert: true });
+
     sendOtp(email, otp);
 
     res.status(200).send('OTP sent');
@@ -172,11 +172,10 @@ app.post('/api/login', async (req, res) => {
     }
 
     const otp = generateOtp();
-    const otpExpiry = new Date(new Date().getTime() + (30 * 60 * 1000)); // 30 minutes from now
+    const expiry = new Date(new Date().getTime() + (30 * 60 * 1000)); // 30 minutes from now
 
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
+    // Save or update OTP in OTP collection
+    await OTP.findOneAndUpdate({ email }, { email, otp, expiry }, { upsert: true });
 
     sendOtp(email, otp);
 
@@ -187,20 +186,24 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Verify OTP for registration
+// Verify OTP for registration
 app.post('/api/verify-register', async (req, res) => {
-  const { email, otp } = req.body;
+  const { email, otp, name, phone } = req.body; // Include name and phone for registration
 
   try {
-    const user = await User.findOne({ email, otp, otpExpiry: { $gte: new Date() } });
-    if (!user) {
+    const otpEntry = await OTP.findOne({ email, otp, expiry: { $gte: new Date() } });
+    if (!otpEntry) {
       return res.status(400).send('Invalid or expired OTP');
     }
 
-    user.otp = '';
-    user.otpExpiry = null;
-    await user.save();
+    // Save user details to User collection
+    const newUser = new User({ name, email, phone });
+    await newUser.save();
 
-    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    // Delete OTP entry
+    await OTP.deleteOne({ _id: otpEntry._id });
+
+    const token = jwt.sign({ email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '12h' });
     res.status(201).json({ message: 'User registered successfully', token });
   } catch (err) {
     res.status(500).send(err.message);
@@ -212,26 +215,22 @@ app.post('/api/verify-login', async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    const user = await User.findOne({ email, otp, otpExpiry: { $gte: new Date() } });
-    if (!user) {
+    const otpEntry = await OTP.findOne({ email, otp, expiry: { $gte: new Date() } });
+    if (!otpEntry) {
       return res.status(400).send('Invalid or expired OTP');
     }
 
-    user.otp = '';
-    user.otpExpiry = null;
-    await user.save();
+    // Delete OTP entry
+    await OTP.deleteOne({ _id: otpEntry._id });
 
-    // Here, generate and send a JWT or some form of session token
-    // This is a placeholder for actual token generation
-    // const token = jwt.sign({ email }, 'your_secret_key');
-    // res.status(200).json({ message: 'Logged in successfully', token });
-    // Generate JWT token
-    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    // Generate JWT token for the verified user
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '12h' });
     res.status(200).json({ message: 'Logged in successfully', token });
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
