@@ -1,28 +1,28 @@
 // app.js
-
-const express = require('express');
-const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const mongoose = require('mongoose');
-require('dotenv').config();
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const multer = require('multer');
-const fs = require('fs');
-const AWS = require('aws-sdk');
-const Registration = require('./models/Registration');
-const User = require('./models/User');
+const express = require("express");
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const mongoose = require("mongoose");
+require("dotenv").config();
+const bodyParser = require("body-parser");
+const cors = require("cors");
+const multer = require("multer");
+const fs = require("fs");
+const AWS = require("aws-sdk");
+const Registration = require("./models/Registration");
+const User = require("./models/User");
+const Admin = require("./models/Admins");
 const OTP = require('./models/Otp');
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION
+  region: process.env.AWS_REGION,
 });
 
 const s3 = new AWS.S3();
 // Configure multer for local file handling
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: "uploads/" });
 const app = express();
 
 // Middleware
@@ -30,9 +30,13 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // MongoDB Connection
-mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.error(err));
+mongoose
+  .connect(process.env.DB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => console.error(err));
 
 // POST API Endpoint
 
@@ -55,10 +59,13 @@ const generateRegistrationEmailContent = (registrationData) => {
   `;
 };
 
+
+
+
 // POST API Endpoint for registration
-app.post('/api/register', upload.single('file'), async (req, res) => {
+app.post("/api/register", upload.single("file"), async (req, res) => {
   try {
-    let file_path = '';
+    let file_path = "";
 
     if (req.file) {
       const fileStream = fs.createReadStream(req.file.path);
@@ -66,7 +73,7 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
       const uploadParams = {
         Bucket: process.env.BUCKET_NAME,
         Key: req.file.originalname,
-        Body: fileStream
+        Body: fileStream,
       };
 
       const uploadResult = await s3.upload(uploadParams).promise();
@@ -76,7 +83,7 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
 
     const registrationData = {
       ...req.body,
-      file_path: file_path
+      file_path: file_path,
     };
 
     const newRegistration = new Registration(registrationData);
@@ -86,15 +93,15 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL,
       to: savedRegistration.email,
-      subject: 'Registration Confirmation for Aces Hackathon',
-      html: generateRegistrationEmailContent(savedRegistration)
+      subject: "Registration Confirmation for Aces Hackathon",
+      html: generateRegistrationEmailContent(savedRegistration),
     };
 
-    transporter.sendMail(mailOptions, function(error, info) {
+    transporter.sendMail(mailOptions, function (error, info) {
       if (error) {
-        console.error('Error sending registration confirmation email:', error);
+        console.error("Error sending registration confirmation email:", error);
       } else {
-        console.log('Registration confirmation email sent:', info.response);
+        console.log("Registration confirmation email sent:", info.response);
       }
     });
 
@@ -104,14 +111,13 @@ app.post('/api/register', upload.single('file'), async (req, res) => {
   }
 });
 
-
 /// Nodemailer configuration
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
     user: process.env.EMAIL,
-    pass: process.env.EMAIL_PASSWORD
-  }
+    pass: process.env.EMAIL_PASSWORD,
+  },
 });
 
 // Helper function to generate OTP
@@ -124,15 +130,15 @@ const sendOtp = (email, otp) => {
   const mailOptions = {
     from: process.env.EMAIL,
     to: email,
-    subject: 'Your OTP',
-    text: `Your OTP is ${otp}`
+    subject: "Your OTP",
+    text: `Your OTP is ${otp}`,
   };
 
-  transporter.sendMail(mailOptions, function(error, info){
+  transporter.sendMail(mailOptions, function (error, info) {
     if (error) {
       console.log(error);
     } else {
-      console.log('Email sent: ' + info.response);
+      console.log("Email sent: " + info.response);
     }
   });
 };
@@ -144,7 +150,7 @@ app.post('/api/registeruser', async (req, res) => {
   try {
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).send('User already exists');
+      return res.status(400).send("User already exists");
     }
 
     const otp = generateOtp();
@@ -155,20 +161,46 @@ app.post('/api/registeruser', async (req, res) => {
 
     sendOtp(email, otp);
 
-    res.status(200).send('OTP sent');
+    res.status(200).send("OTP sent");
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
+app.post("/api/registerAdminUser", async (req, res) => {
+  const { name, email, phone } = req.body;
 
+  try {
+    const userExists = await Admin.findOne({ email });
+    if (userExists) {
+      return res.status(400).send("User already exists");
+    }
+
+    const newUser = new Admin({ name, email, phone });
+    await newUser.save();
+
+    res.status(200).send("Registered");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+app.get("/api/getUsers", (req, res) => {
+  User.find().then((user) => {
+    res.json(user);
+  });
+});
+app.get("/api/getTeamDetails", (req, res) => {
+  Registration.find().then((user) => {
+    res.json(user);
+  });
+});
 // Login user and send OTP
-app.post('/api/login', async (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email } = req.body;
 
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).send('User not found');
+      return res.status(404).send("User not found");
     }
 
     const otp = generateOtp();
@@ -179,13 +211,32 @@ app.post('/api/login', async (req, res) => {
 
     sendOtp(email, otp);
 
-    res.status(200).send('OTP sent');
+    res.status(200).send({ email: email, otp: otp });
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
+app.post("/api/Adminlogin", async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await Admin.findOne({ email });
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
 
-// Verify OTP for registration
+    const otp = generateOtp();
+    // const otpExpiry = new Date(new Date().getTime() + 30 * 60 * 1000); // 30 minutes from now
+
+    user.otp = otp;
+    // user.otpExpiry = otpExpiry;
+    await user.save();
+
+    sendOtp(email, otp);
+    res.status(200).json({ email: email, resp: "logged in" });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 // Verify OTP for registration
 app.post('/api/verify-register', async (req, res) => {
   const { email, otp, name, phone } = req.body; // Include name and phone for registration
@@ -212,7 +263,7 @@ app.post('/api/verify-register', async (req, res) => {
 });
 
 // Verify OTP for login
-app.post('/api/verify-login', async (req, res) => {
+app.post("/api/verify-login", async (req, res) => {
   const { email, otp } = req.body;
 
   try {
