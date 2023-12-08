@@ -283,6 +283,30 @@ app.post("/api/verify-login", async (req, res) => {
   }
 });
 
+app.post("/api/verifyAdminlogin", async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    const user = await Admin.findOne({
+      email,
+      otp,
+      // otpExpiry: { $gte: new Date() },
+    });
+    if (!user) {
+      return res.status(400).send("Invalid or expired OTP");
+    }
+
+    // user.otp = "";
+    // user.otpExpiry = null;
+    // await user.save();
+    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, {
+      expiresIn: "12h",
+    });
+    res.status(200).json({ message: "Logged in successfully", token });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
